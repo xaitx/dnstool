@@ -1,0 +1,4 @@
+github.com/xaitx/logs v1.1.1 h1:0M0RuMg156BSEX2K6xb4ICniygC6qm6NzkBsQdFoWnw=
+github.com/xaitx/logs v1.1.1/go.mod h1:5JdupfrC+Ie/GTffEeA7yaYNAclhhGH5eulwV1G4jM8=
+golang.org/x/net v0.34.0 h1:Mb7Mrk043xzHgnRM88suvJFwzVrRfHEHJEl5/71CKw0=
+golang.org/x/net v0.34.0/go.mod h1:di0qlW3YNM5oh6GqDGQr92MyTozJPmybPK4Ev/Gm31k=
