@@ -7,20 +7,24 @@ import (
 )
 
 type Config struct {
-	Server    string
-	Port      int
-	QueryType string
-	Domain    string
-	Timeout   int
+	Server        string
+	Port          int
+	QueryType     string
+	Domain        string
+	Timeout       int
+	Retries       int
+	RetryInterval int
 }
 
 func ParseFlags() (*Config, error) {
 	cfg := &Config{}
 
-	flag.StringVar(&cfg.Server, "server", "8.8.8.8", "dns server,and support doh server")
-	flag.IntVar(&cfg.Port, "port", 53, "dns server port,doh server port is not used")
-	flag.StringVar(&cfg.QueryType, "type", "A", "can be A, AAAA, CNAME, MX, NS, PTR, SOA, SRV, TXT or ANY. case insensitive")
-	flag.IntVar(&cfg.Timeout, "timeout", 5, "dns query timeout")
+	flag.StringVar(&cfg.Server, "server", "8.8.8.8", "DNS服务器地址")
+	flag.IntVar(&cfg.Port, "port", 53, "DNS服务器端口")
+	flag.StringVar(&cfg.QueryType, "type", "A", "查询类型 (A, AAAA, CNAME, MX, NS, PTR, TXT, ALL)")
+	flag.IntVar(&cfg.Timeout, "timeout", 5, "查询超时时间(秒)")
+	flag.IntVar(&cfg.Retries, "retries", 3, "查询失败重试次数")
+	flag.IntVar(&cfg.RetryInterval, "retry-interval", 1, "重试间隔时间(秒)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [Options] domain\n\n", os.Args[0])
@@ -35,7 +39,7 @@ func ParseFlags() (*Config, error) {
 	flag.Parse()
 
 	if flag.NArg() != 1 {
-		return nil, fmt.Errorf("please input domain")
+		return nil, fmt.Errorf("请提供要查询的域名")
 	}
 	cfg.Domain = flag.Arg(0)
 

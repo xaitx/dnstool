@@ -24,10 +24,9 @@ func New(server string, port int) *Resolver {
 }
 
 func (r *Resolver) Query(ctx context.Context, domain string, queryType string) (*dnsmessage.Message, error) {
-
 	qtype, err := parseQueryType(queryType)
 	if err != nil {
-		return nil, err
+		return nil, &DNSFormatError{Message: err.Error()}
 	}
 
 	// 判断domain是否以.结尾
@@ -37,7 +36,7 @@ func (r *Resolver) Query(ctx context.Context, domain string, queryType string) (
 
 	name, err := dnsmessage.NewName(domain)
 	if err != nil {
-		return nil, err
+		return nil, &DNSFormatError{Message: fmt.Sprintf("invalid domain name: %v", err)}
 	}
 
 	msg := dnsmessage.Message{
@@ -56,7 +55,7 @@ func (r *Resolver) Query(ctx context.Context, domain string, queryType string) (
 
 	packed, err := msg.Pack()
 	if err != nil {
-		return nil, err
+		return nil, &DNSFormatError{Message: fmt.Sprintf("failed to pack DNS message: %v", err)}
 	}
 
 	var msgData []byte
@@ -64,41 +63,60 @@ func (r *Resolver) Query(ctx context.Context, domain string, queryType string) (
 	if strings.HasPrefix(r.server, "https://") {
 		msgData, err = queryDoH(r.server, packed)
 		if err != nil {
-			return nil, err
+			return nil, &DNSNetworkError{
+				Message: "DoH query failed",
+				Cause:   err,
+			}
 		}
 	} else {
 		conn, err := net.Dial("udp", net.JoinHostPort(r.server, strconv.Itoa(r.port)))
 		if err != nil {
-			return nil, err
+			return nil, &DNSNetworkError{
+				Message: "failed to connect to DNS server",
+				Cause:   err,
+			}
 		}
 		defer conn.Close()
 
 		if deadline, ok := ctx.Deadline(); ok {
-			conn.SetDeadline(deadline)
+			if err := conn.SetDeadline(deadline); err != nil {
+				return nil, &DNSNetworkError{
+					Message: "failed to set connection deadline",
+					Cause:   err,
+				}
+			}
 		}
 
 		if _, err := conn.Write(packed); err != nil {
-			return nil, err
+			return nil, &DNSNetworkError{
+				Message: "failed to send DNS query",
+				Cause:   err,
+			}
 		}
 
 		response := make([]byte, 512)
 		n, err := conn.Read(response)
 		if err != nil {
-			return nil, err
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				return nil, &DNSTimeoutError{Message: "query timed out"}
+			}
+			return nil, &DNSNetworkError{
+				Message: "failed to receive DNS response",
+				Cause:   err,
+			}
 		}
 		msgData = response[:n]
 	}
 
 	var result dnsmessage.Message
 	if err := result.Unpack(msgData); err != nil {
-		return nil, err
+		return nil, &DNSFormatError{Message: fmt.Sprintf("failed to unpack DNS response: %v", err)}
 	}
 
 	return &result, nil
 }
 
 func parseQueryType(qt string) (dnsmessage.Type, error) {
-	// 将qt转换为大写
 	qt = strings.ToUpper(qt)
 
 	switch qt {
